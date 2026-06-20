@@ -5,8 +5,8 @@ set -eu
 APP_NAME="qw-agent"
 REPO="${REPO:-mzbac/Qwen3.6-35B-A3B-ssd-offload}"
 ASSET_NAME="${ASSET_NAME:-qw-agent.zip}"
-HF_REPO="${HF_REPO:-unsloth/Qwen3.6-35B-A3B-MTP-GGUF}"
-MODEL_FILE="${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf}"
+HF_REPO="${HF_REPO:-unsloth/Qwen3.6-35B-A3B-GGUF}"
+MODEL_FILE="${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q6_K.gguf}"
 
 VERSION="latest"
 INSTALL_DIR="${INSTALL_DIR:-"$HOME/.local/bin"}"
