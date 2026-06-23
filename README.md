@@ -8,6 +8,13 @@ Install a release build and the default Qwen3.6 GGUF:
 curl -fsSL https://raw.githubusercontent.com/mzbac/Qwen3.6-35B-A3B-ssd-offload/main/install.sh | sh
 ```
 
+The default installer model is Unsloth's 4-bit `UD-Q4_K_M` GGUF. To install the
+higher-quality 6-bit `UD-Q6_K` GGUF instead:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mzbac/Qwen3.6-35B-A3B-ssd-offload/main/install.sh | sh -s -- --model-quant 6bit
+```
+
 Install only the binary:
 
 ```bash
