@@ -5,8 +5,13 @@ set -eu
 APP_NAME="qw-agent"
 REPO="${REPO:-mzbac/Qwen3.6-35B-A3B-ssd-offload}"
 ASSET_NAME="${ASSET_NAME:-qw-agent.zip}"
-HF_REPO="${HF_REPO:-unsloth/Qwen3.6-35B-A3B-GGUF}"
-MODEL_FILE="${MODEL_FILE:-Qwen3.6-35B-A3B-UD-Q6_K.gguf}"
+DEFAULT_HF_REPO="unsloth/Qwen3.6-35B-A3B-GGUF"
+DEFAULT_MODEL_QUANT="4bit"
+MODEL_FILE_Q4="Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+MODEL_FILE_Q6="Qwen3.6-35B-A3B-UD-Q6_K.gguf"
+HF_REPO="${HF_REPO:-$DEFAULT_HF_REPO}"
+MODEL_QUANT="${MODEL_QUANT:-$DEFAULT_MODEL_QUANT}"
+MODEL_FILE="${MODEL_FILE:-}"
 
 VERSION="latest"
 INSTALL_DIR="${INSTALL_DIR:-"$HOME/.local/bin"}"
@@ -39,19 +44,27 @@ Options:
   --bin-name NAME         Installed command name. Default: qw-agent
   --model-dir DIR         Download model into DIR. Default: \$HOME/.qw-agent/model
   --hf-repo REPO          Hugging Face model repository. Default: $HF_REPO
-  --model-file NAME       GGUF model file. Default: $MODEL_FILE
+  --model-quant 4bit|6bit Model preset to download. Default: $DEFAULT_MODEL_QUANT
+                         4bit uses $MODEL_FILE_Q4
+                         6bit uses $MODEL_FILE_Q6
+  --model-file NAME       Exact GGUF model file. Overrides --model-quant
   --no-model              Install the binary only; do not download the GGUF
   --no-modify-path        Do not update shell startup files
   -h, --help              Show this help
 
 Environment:
   HF_TOKEN                Optional Hugging Face token used for model download
+  MODEL_QUANT             Optional model preset: 4bit or 6bit
+  MODEL_FILE              Optional exact GGUF filename; overrides MODEL_QUANT
 
 Examples:
   curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh
 
   curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh \\
     | sh -s -- --version 0.0.1
+
+  curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh \\
+    | sh -s -- --model-quant 6bit
 
   curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh \\
     | sh -s -- --install-dir "\$HOME/bin" --no-model
@@ -93,6 +106,11 @@ while [ "$#" -gt 0 ]; do
     --hf-repo)
       [ "$#" -ge 2 ] || die "--hf-repo requires a value"
       HF_REPO="$2"
+      shift 2
+      ;;
+    --model-quant|--quant)
+      [ "$#" -ge 2 ] || die "$1 requires a value"
+      MODEL_QUANT="$2"
       shift 2
       ;;
     --model-file)
@@ -141,6 +159,42 @@ normalize_dir() {
       printf '%s/%s\n' "$(pwd)" "$1"
       ;;
   esac
+}
+
+canonical_model_quant() {
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    4|4bit|q4|q4_k|q4_k_m|ud-q4|ud-q4_k|ud-q4_k_m)
+      printf '%s\n' "4bit"
+      ;;
+    6|6bit|q6|q6_k|ud-q6|ud-q6_k)
+      printf '%s\n' "6bit"
+      ;;
+    *)
+      die "unsupported model quant: $1 (use 4bit or 6bit)"
+      ;;
+  esac
+}
+
+model_file_for_quant() {
+  case "$1" in
+    4bit)
+      printf '%s\n' "$MODEL_FILE_Q4"
+      ;;
+    6bit)
+      printf '%s\n' "$MODEL_FILE_Q6"
+      ;;
+    *)
+      die "unsupported model quant: $1 (use 4bit or 6bit)"
+      ;;
+  esac
+}
+
+resolve_model_selection() {
+  MODEL_QUANT="$(canonical_model_quant "$MODEL_QUANT")"
+  if [ -z "$MODEL_FILE" ]; then
+    MODEL_FILE="$(model_file_for_quant "$MODEL_QUANT")"
+  fi
 }
 
 download_url() {
@@ -288,6 +342,7 @@ main() {
 
   INSTALL_DIR="$(normalize_dir "$INSTALL_DIR")"
   MODEL_DIR="$(normalize_dir "$MODEL_DIR")"
+  resolve_model_selection
 
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/qw-agent.XXXXXX")"
   trap 'rm -rf "$tmp_dir"' EXIT INT TERM
@@ -303,6 +358,8 @@ main() {
   info "Release repo: $REPO"
   info "Install dir: $INSTALL_DIR"
   info "Model dir: $MODEL_DIR"
+  info "Model quant: $MODEL_QUANT"
+  info "Model file: $MODEL_FILE"
   info "Download: $url"
 
   curl -fL --proto '=https' --tlsv1.2 -o "$archive_path" "$url"
